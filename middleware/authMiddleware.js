@@ -10,7 +10,9 @@ module.exports = (req, res, next) => {
   const token = authHeader.split(' ')[1];
 
   try {
-    const decoded = jwt.verify(token, "supersecretkey");
+    // Use process.env.JWT_SECRET to match your login controller
+    const secret = process.env.JWT_SECRET || "super_secret_key_change_this";
+    const decoded = jwt.verify(token, secret);
     req.user = decoded;
     next();
   } catch (err) {

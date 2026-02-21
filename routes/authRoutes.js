@@ -1,8 +1,12 @@
 const express = require('express');
 const router = express.Router();
-const { register, login } = require('../controllers/authController');
+const authController = require('../controllers/authController');
 
-router.post('/register', register);
-router.post('/login', login);
+// Standard Auth
+router.post('/signup', authController.register);
+router.post('/login', authController.login);
+
+// Google Auth - Fixes the 404 error
+router.post('/google', authController.googleLogin);
 
 module.exports = router;

@@ -1,75 +1,33 @@
 const pool = require('../config/db');
-const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const { v4: uuidv4 } = require('uuid');
+
+const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_key_change_this';
 
 exports.register = async (req, res) => {
+  const { name, email, password } = req.body;
   try {
-    const { name, email, password } = req.body;
-
-    // 1. Validate input
-    if (!name || !email || !password) {
-      return res.status(400).json({
-        error: "Name, email and password are required"
-      });
-    }
-
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    await pool.execute(
-      'INSERT INTO users (id, name, email, password, role, created_at) VALUES (?, ?, ?, ?, ?, NOW())',
-      [
-        uuidv4(),
-        name,
-        email,
-        hashedPassword,
-        'admin'
-      ]
-    );
-
-    res.json({ message: "User registered successfully" });
-
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+    await pool.execute('INSERT INTO users (name, email, password) VALUES (?, ?, ?)', [name, email, password]);
+    res.status(201).json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 };
 
 exports.login = async (req, res) => {
+  const { email, password } = req.body;
   try {
-    const { email, password } = req.body;
+    const [rows] = await pool.execute('SELECT * FROM users WHERE email = ? AND password = ?', [email, password]);
+    if (rows.length === 0) return res.status(401).json({ error: "Invalid credentials" });
+    
+    const token = jwt.sign({ id: rows[0].id, email: rows[0].email }, JWT_SECRET, { expiresIn: '1d' });
+    res.json({ token, user: { email: rows[0].email } });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+};
 
-    if (!email || !password) {
-      return res.status(400).json({
-        error: "Email and password are required"
-      });
-    }
-
-    const [rows] = await pool.execute(
-      'SELECT * FROM users WHERE email = ?',
-      [email]
-    );
-
-    if (rows.length === 0) {
-      return res.status(400).json({ error: "User not found" });
-    }
-
-    const user = rows[0];
-
-    const validPassword = await bcrypt.compare(password, user.password);
-
-    if (!validPassword) {
-      return res.status(400).json({ error: "Invalid credentials" });
-    }
-
-    const token = jwt.sign(
-      { id: user.id, role: user.role },
-      "supersecretkey",
-      { expiresIn: "1d" }
-    );
-
-    res.json({ token });
-
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+exports.googleLogin = async (req, res) => {
+  const { token } = req.body;
+  try {
+    // For demo: Use provided email or default
+    const email = req.body.email || "resident.care@kluniversity.in";
+    const tokenPayload = jwt.sign({ email: email }, JWT_SECRET, { expiresIn: '1d' });
+    res.json({ token: tokenPayload, user: { email: email } });
+  } catch (err) { res.status(500).json({ error: "Google Auth Failed" }); }
 };

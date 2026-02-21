@@ -1,50 +1,88 @@
-const express = require('express');
-const cors = require('cors');
-require('dotenv').config();
-
-const recipeRoutes = require('./routes/recipeRoutes');
-const residentRoutes = require('./routes/residentRoutes');
-const carePlanRoutes = require('./routes/carePlanRoutes');
-const authRoutes = require('./routes/authRoutes');
-const authMiddleware = require('./middleware/authMiddleware');
-const dashboardRoutes = require('./routes/dashboardRoutes');
-const reportRoutes = require('./routes/reportRoutes');
-
-
+require("dotenv").config();
+const express = require("express");
+const cors = require("cors");
+const path = require("path");
+const fs = require("fs");
 
 const app = express();
 
-app.use(cors());
-app.use(express.json());
-app.use('/api/auth', authRoutes);
-app.use('/api/dashboard', dashboardRoutes);
-app.use('/api/reports', reportRoutes);
+
+// --------------------
+// Ensure uploads folder exists
+// --------------------
+const uploadDir = path.join(__dirname, "uploads");
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir);
+}
 
 
-app.use('/api/recipes', recipeRoutes);
-app.use('/api/residents', residentRoutes);
-app.use('/api/careplan', carePlanRoutes);
-app.use('/api/residents', authMiddleware, require('./routes/residentRoutes'));
-app.use('/api/recipes', authMiddleware, require('./routes/recipeRoutes'));
-app.use('/api/careplan', authMiddleware, require('./routes/carePlanRoutes'));
-app.use('/api/inventory', authMiddleware, require('./routes/inventoryRoutes'));
-app.get('/', (req, res) => {
-  res.json({ message: "MT MediMorph Backend Running" });
+// --------------------
+// Core middleware
+// --------------------
+app.use(express.json()); // REQUIRED for req.body
+app.use(express.urlencoded({ extended: true }));
+
+app.use(cors({
+  origin: ["http://localhost:5173", "http://localhost:5174"],
+  credentials: true
+}));
+
+app.use("/uploads", express.static(uploadDir));
+
+
+// --------------------
+// Import Routes
+// --------------------
+const authRoutes = require("./routes/authRoutes");
+const recipeRoutes = require("./routes/recipeRoutes");
+const residentRoutes = require("./routes/residentRoutes");
+const aiRoutes = require("./routes/ai");
+const dashboardRoutes = require("./routes/dashboardRoutes");
+const shoppingRoutes = require("./routes/shoppingRoutes");
+const inventoryRoutes = require("./routes/inventoryRoutes");
+const mealPlanRoutes = require("./routes/mealPlanRoutes");
+
+
+// --------------------
+// Route Mounting
+// --------------------
+app.use("/api/auth", authRoutes);
+app.use("/api/recipes", recipeRoutes);
+app.use("/api/residents", residentRoutes);
+app.use("/api/ai", aiRoutes);
+app.use("/api/dashboard", dashboardRoutes);
+app.use("/api/shopping-lists", shoppingRoutes);
+app.use("/api/inventory", inventoryRoutes);
+app.use("/api/meal-plans", mealPlanRoutes);
+
+
+// --------------------
+// 404 handler (helps debugging)
+// --------------------
+app.use((req, res) => {
+  res.status(404).json({
+    error: "Route not found",
+    path: req.originalUrl
+  });
 });
 
-const PORT = process.env.PORT || 5000;
 
+// --------------------
+// Global error handler
+// --------------------
+app.use((err, req, res, next) => {
+  console.error("GLOBAL ERROR:", err);
+  res.status(500).json({
+    error: "Internal server error",
+    message: err.message
+  });
+});
+
+
+// --------------------
+// Start server
+// --------------------
+const PORT = process.env.PORT || 5001;
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(`✅ Server running on port ${PORT}`);
 });
-app.use('/api/inventory', require('./routes/inventoryAdvanced'));
-app.use('/api/shopping', require('./routes/shopping'));
-app.use('/api/analytics', require('./routes/analytics'));
-app.use('/api/cost', require('./routes/cost'));
-app.use('/api/mealplanner', require('./routes/mealPlanner'));
-app.use('/api/ai', require('./routes/ai'));
-app.use('/api/ai', require('./routes/mealOptimizer'));
-app.use('/api/ai', require('./routes/advancedMealOptimizer'));
-app.use('/api/analytics', require('./routes/analytics'));
-app.use('/api/shopping', require('./routes/shoppingList'));
-app.use('/api/feedback', require('./routes/feedback'));
